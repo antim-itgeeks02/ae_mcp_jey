@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Chatbot</title>
+  <script src="https://cdn.jsdelivr.net/npm/react@18/umd/react.development.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/babel-standalone@7/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body>
+  <div id="root" class="min-h-screen bg-gray-100 flex items-center justify-center p-4"></div>
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    function Chatbot() {
+      const [messages, setMessages] = useState([]);
+      const [input, setInput] = useState('');
+      const [sessionId, setSessionId] = useState(null);
+      const [isConnected, setIsConnected] = useState(false);
+
+      // Initialize SSE connection
+      useEffect(() => {
+        let eventSource;
+
+        const connectSSE = () => {
+          eventSource = new EventSource('http://localhost:3001/sse');
+
+          eventSource.onopen = () => {
+            console.log('SSE connection opened');
+            setIsConnected(true);
+          };
+
+          eventSource.onmessage = (event) => {
+            try {
+              const data = JSON.parse(event.data);
+              if (data.sessionId) {
+                setSessionId(data.sessionId);
+                console.log('Received sessionId:', data.sessionId);
+              } else if (data.message) {
+                setMessages((prev) => [...prev, { text: data.message, from: 'server' }]);
+              }
+            } catch (error) {
+              console.error('Error parsing SSE message:', error);
+            }
+          };
+
+          eventSource.onerror = () => {
+            console.error('SSE connection error');
+            setIsConnected(false);
+            setTimeout(connectSSE, 3000); // Attempt to reconnect every 3 seconds
+          };
+        };
+
+        connectSSE();
+
+        return () => {
+          if (eventSource) {
+            eventSource.close();
+            console.log('SSE connection closed');
+          }
+        };
+      }, []);
+
+      // Handle sending messages
+      const sendMessage = async () => {
+        if (!input.trim() || !sessionId) return;
+
+        try {
+          const response = await fetch(`http://localhost:3001/messages?sessionId=${sessionId}`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ message: input }),
+          });
+
+          if (response.ok) {
+            setMessages((prev) => [...prev, { text: input, from: 'user' }]);
+            setInput('');
+          } else {
+            console.error('Failed to send message:', await response.text());
+          }
+        } catch (error) {
+          console.error('Error sending message:', error);
+        }
+      };
+
+      // Handle Enter key press
+      const handleKeyPress = (e) => {
+        if (e.key === 'Enter') {
+          sendMessage();
+        }
+      };
+
+      return (
+        <div className="w-full max-w-md bg-white rounded-lg shadow-lg p-6">
+          <h1 className="text-2xl font-bold mb-4 text-center">Chatbot</h1>
+          <div className="mb-4 text-sm text-gray-600">
+            {isConnected ? 'Connected to server' : 'Connecting...'}
+          </div>
+          <div className="h-64 overflow-y-auto border rounded p-4 mb-4 bg-gray-50">
+            {messages.map((msg, index) => (
+              <div
+                key={index}
+                className={`mb-2 p-2 rounded ${
+                  msg.from === 'user' ? 'bg-blue-100 ml-auto max-w-xs' : 'bg-gray-200 mr-auto max-w-xs'
+                }`}
+              >
+                {msg.text}
+              </div>
+            ))}
+          </div>
+          <div className="flex">
+            <input
+              type="text"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyPress={handleKeyPress}
+              className="flex-1 p-2 border rounded-l focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Type your message..."
+              disabled={!isConnected || !sessionId}
+            />
+            <button
+              onClick={sendMessage}
+              className="p-2 bg-blue-500 text-white rounded-r hover:bg-blue-600 disabled:bg-gray-400"
+              disabled={!isConnected || !sessionId}
+            >
+              Send
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.render(<Chatbot />, document.getElementById('root'));
+  </script>
+</body>
+</html>

@@ -8,16 +8,20 @@
     "start": "node index.js"
   },
   "dependencies": {
+    "@google/genai": "^1.13.0",
     "@modelcontextprotocol/sdk": "^1.8.0",
     "axios": "^1.11.0",
     "body-parser": "^2.2.0",
     "cors": "^2.8.5",
-    "dotenv": "^17.2.0",
+    "dotenv": "^17.2.1",
     "express": "^5.1.0",
     "mongoose": "^8.16.4",
     "openai": "^5.10.1",
     "shopify-api-node": "^3.15.0",
+    "socket.io": "^4.8.1",
     "twitter-api-v2": "^1.24.0",
+    "uuid": "^11.1.0",
+    "ws": "^8.18.3",
     "zod": "^3.25.76"
   },
   "keywords": [],

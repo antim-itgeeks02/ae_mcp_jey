@@ -1,0 +1,51 @@
+const express = require('express'); 
+const http = require('http'); 
+const socketIO = require('socket.io'); 
+const MCP = require('modelcontextprotocol'); 
+// import MCP SDKconst app = express(); 
+const server = http.createServer(app); 
+const io = socketIO(server);
+// MCP connection options - replace with your MCP server details 
+const MCP_OPTIONS = { 
+    host: 'mcp.example.com', 
+    port: 1234, // Add any auth or config options here if needed 
+};
+async function startServer() { 
+    try { // Create MCP client instance 
+    const mcpClient = new MCP.Client(MCP_OPTIONS);
+// Connect to MCP server - assuming it returns a promise
+await mcpClient.connect();
+console.log('Connected to MCP server.');
+
+// Start HTTP + Socket.IO server after MCP connection is ready
+const PORT = 3000;
+server.listen(PORT, () => {
+  console.log(`Server listening on port ${PORT}`);
+});
+
+// Listen for messages/events from MCP server
+mcpClient.on('message', (msg) => {
+  console.log('Received from MCP:', msg);
+  // Broadcast to all Socket.IO clients
+  io.emit('mcp-message', msg);
+});
+io.on('connection', (socket) => {
+  console.log('Client connected:', socket.id);
+
+  // When Socket.IO client sends a message, forward it to MCP server
+  socket.on('message', (msg) => {
+    console.log(`Message from client ${socket.id}:`, msg);
+
+    // Assuming mcpClient has a send method
+    mcpClient.send(msg);
+  });
+
+  socket.on('disconnect', () => {
+    console.log('Client disconnected:', socket.id);
+  });
+});
+} catch (err) { 
+    console.error('Error connecting to MCP server:', err); 
+    } 
+}
+startServer();
