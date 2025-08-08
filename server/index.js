@@ -9,11 +9,13 @@ import { GoogleGenAI } from "@google/genai";
 import cors from "cors";
 import http from "http";
 import { Server as SocketIOServer } from 'socket.io';
+import { z } from "zod";
 
 const server = new McpServer({
   name: "example-server",
   version: "1.0.0"
 });
+server.registerTool( "calculate-bmi", { title: "BMI Calculator", description: "Calculate Body Mass Index", inputSchema: { weightKg: z.number(), heightM: z.number() } }, async ({ weightKg, heightM }) => ({ content: [{ type: "text", text: String(weightKg / (heightM * heightM)) }] }) );
 
 const app = express();
 app.use(cors({ origin: ["http://localhost:5173", "http://localhost:3000"] }));
@@ -26,7 +28,7 @@ const io = new SocketIOServer(ioServer);
 const ai = new GoogleGenAI(process.env.GEMINI_API_KEY || '');
 
 // Register tools with the server
-registerTools(server);
+// registerTools(server);
 
 // Handle client connection
 io.on("connection", (socket) => {
@@ -101,18 +103,19 @@ app.post('/chat', async (req, res) => {
     // Add current message
     chatHistory.push({ role: "user", parts: [{ text: message }] });
 
-    console.log(geminiToolDeclarations, registerTools(server));
+    // console.log(geminiToolDeclarations, registerTools(server));
     
     // Initialize model and generate content
-    const response = ai.models.generateContent({ model: "gemini-2.0-flash", 
+    const response = await ai.models.generateContent({ model: "gemini-2.0-flash", 
     // const response = await genAI.generateContent({
       contents: chatHistory,
-      tools: geminiToolDeclarations.length ? [{ functionDeclarations: geminiToolDeclarations }] : undefined
+      tools: [{ functionDeclarations: geminiToolDeclarations }] 
     });
 
     console.log("Response from AI:", JSON.stringify(response.response, null, 2));
 
-    const part = response.response.candidates[0].content.parts[0];
+    const part = response.candidates[0].content.parts[0];
+    console.log("Part:", part);
     let responseText = "";
     if (part.functionCall) {
       console.log("Function call:", part.functionCall.name, "Message:", message);
